@@ -5,8 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import cl.duoc.rutalimpia.rutas_service.model.enums.EstadoHojaRuta;
-import cl.duoc.rutalimpia.rutas_service.security.Parada;
-import jakarta.annotation.Generated;
+
+import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -38,8 +38,8 @@ import lombok.Setter;
 
 public class HojaRuta {
     @Id
-    @Generatedvalue(strategy = GenerationType.IDENTITY)
-    Private Long id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     @Column (name = "camion_id", nullable = false)
     private Long camionId;

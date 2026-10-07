@@ -5,6 +5,6 @@ public enum TipoResiduo {
     VIDRIO,
     PAPEL_CARTON,
     METAL,
-    TETRA_PACK,
+    TETRA_PAK,
     ORGANICO
 }
