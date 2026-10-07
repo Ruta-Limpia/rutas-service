@@ -1,4 +1,4 @@
-package com.duoc.rutalimpia.rutas_service;
+package cl.duoc.rutalimpia.rutas_service;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
