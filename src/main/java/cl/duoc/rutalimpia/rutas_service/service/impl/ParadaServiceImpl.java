@@ -2,6 +2,14 @@ package cl.duoc.rutalimpia.rutas_service.service.impl;
 
 import java.time.LocalDateTime;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import cl.duoc.rutalimpia.rutas_service.exception.ReglaNegocioException;
+
+import cl.duoc.rutalimpia.rutas_service.client.SolicitudesClient;
+import cl.duoc.rutalimpia.rutas_service.dto.ActualizarEstadoSolicitudRequest;
+import cl.duoc.rutalimpia.rutas_service.model.enums.EstadoSolicitud;
+
 import cl.duoc.rutalimpia.rutas_service.exception.RecursoNoEncontradoException;
 
 import org.springframework.stereotype.Service;
@@ -27,18 +35,25 @@ import cl.duoc.rutalimpia.rutas_service.service.ParadaService;
 @Service
 public class ParadaServiceImpl implements ParadaService {
 
+    private static final Logger logger =
+            LoggerFactory.getLogger(ParadaServiceImpl.class);
+
     private final ParadaRepository paradaRepository;
     private final HojaRutaRepository hojaRutaRepository;
     private final ParadaMapper paradaMapper;
+    private final SolicitudesClient solicitudesClient;
+    
 
     public ParadaServiceImpl(
             ParadaRepository paradaRepository,
             HojaRutaRepository hojaRutaRepository,
-            ParadaMapper paradaMapper
+            ParadaMapper paradaMapper,
+            SolicitudesClient solicitudesClient
     ) {
         this.paradaRepository = paradaRepository;
         this.hojaRutaRepository = hojaRutaRepository;
         this.paradaMapper = paradaMapper;
+        this.solicitudesClient = solicitudesClient;
     }
 
     @Override
@@ -73,7 +88,7 @@ public class ParadaServiceImpl implements ParadaService {
 
         // Comprobar que la hoja siga abierta
         if (hojaRuta.getEstado() != EstadoHojaRuta.ABIERTA) {
-            throw new IllegalStateException(
+            throw new ReglaNegocioException(
                     "La hoja de ruta ya está finalizada"
             );
         }
@@ -83,7 +98,7 @@ public class ParadaServiceImpl implements ParadaService {
                 .countByHojaRutaId(hojaRuta.getId());
 
         if (cantidadParadas >= request.capacidadParadas()) {
-            throw new IllegalStateException(
+            throw new ReglaNegocioException(
                     "Camión sin cupo"
             );
         }
@@ -137,7 +152,7 @@ public class ParadaServiceImpl implements ParadaService {
 
         // Verificar que esté pendiente
         if (parada.getEstado() != EstadoParada.PENDIENTE) {
-            throw new IllegalStateException(
+            throw new ReglaNegocioException(
                     "La parada ya tiene un resultado registrado"
             );
         }
@@ -146,7 +161,7 @@ public class ParadaServiceImpl implements ParadaService {
         if (request.resultado() != EstadoParada.REALIZADA
                 && request.resultado() != EstadoParada.FALLIDA) {
 
-            throw new IllegalStateException(
+            throw new ReglaNegocioException(
                     "El resultado debe ser REALIZADA o FALLIDA"
             );
         }
@@ -156,7 +171,7 @@ public class ParadaServiceImpl implements ParadaService {
                 && (request.motivoFallo() == null
                 || request.motivoFallo().isBlank())) {
 
-            throw new IllegalStateException(
+            throw new ReglaNegocioException(
                     "Debes indicar el motivo"
             );
         }
@@ -172,10 +187,41 @@ public class ParadaServiceImpl implements ParadaService {
 
         parada.setFechaRegistro(LocalDateTime.now());
 
-        // Guardar los cambios
         Parada paradaGuardada = paradaRepository.save(parada);
 
-        // Devolver la respuesta
+        // Determinar el nuevo estado de la solicitud
+        EstadoSolicitud nuevoEstado;
+
+        if (request.resultado() == EstadoParada.REALIZADA) {
+        nuevoEstado = EstadoSolicitud.RETIRADA;
+        } else {
+        nuevoEstado = EstadoSolicitud.FALLIDA;
+        }
+
+        // Preparar la información que enviaremos a solicitudes-service
+        ActualizarEstadoSolicitudRequest actualizacion =
+                new ActualizarEstadoSolicitudRequest(
+                        nuevoEstado,
+                        parada.getHojaRuta().getCamionId(),
+                        parada.getId(),
+                        parada.getMotivoFallo()
+                );
+
+        // Notificar al microservicio de solicitudes
+        try {
+        solicitudesClient.actualizarEstado(
+                parada.getSolicitudId(),
+                actualizacion
+        );
+
+        } catch (Exception ex) {
+        logger.error(
+                "No se pudo actualizar la solicitud {} en solicitudes-service",
+                parada.getSolicitudId(),
+                ex
+        );
+        }
+
         return paradaMapper.toResponse(paradaGuardada);
     }
 }
