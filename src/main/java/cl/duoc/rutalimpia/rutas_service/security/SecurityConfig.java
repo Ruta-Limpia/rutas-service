@@ -71,6 +71,10 @@ public class SecurityConfig {
             // Configurar permisos
             .authorizeHttpRequests(auth -> auth
 
+                .dispatcherTypeMatchers(
+                jakarta.servlet.DispatcherType.ERROR
+                ).permitAll()
+
                 // Endpoints internos: acceso controlado por InternalKeyFilter
                 .requestMatchers("/api/v1/internal/**")
                 .permitAll()
